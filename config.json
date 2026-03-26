@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "shipra": {
+            "command": "uv",
+            "args": [
+                "--directory",
+                "F:\\Work\\2026\\mcp-tools\\shipra-alerts-mcp-py",
+                "run",
+                "main.py"
+            ]
+        }
+    }
+}
