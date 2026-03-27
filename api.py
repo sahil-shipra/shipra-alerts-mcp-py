@@ -2,7 +2,7 @@ import requests
 from dotenv import load_dotenv
 import os
 load_dotenv()
-base_url = os.getenv("BASE_URL")
+base_url = os.getenv("API_BASE_URL")
 API_URL = f"{base_url}/admin/v2/alerts"
 
 
