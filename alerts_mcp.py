@@ -1,6 +1,11 @@
-from mcp.server.fastmcp import FastMCP
+import contextvars
+import json
+import sys
+from fastmcp import FastMCP
+# from mcp.server.fastmcp import FastMCP
+import json
 from typing import Optional, Literal, List
-from apis import create_alert, get_alert_list, get_alert
+from api import create_alert, get_alert_list, get_alert
 from create_alert import (
     _dma_condition,
     _drawdown_condition,
@@ -9,12 +14,51 @@ from create_alert import (
     _price_condition,
     _rsi_condition,
 )
+import logging
+from fastmcp.server.dependencies import get_access_token
 
-mcp = FastMCP("shipra")
+# Add authentication to your FastAPI app
+from fastapi import Depends, HTTPException, Header
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastmcp.server.auth.providers.debug import DebugTokenVerifier
+
+security = HTTPBearer()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+logger = logging.getLogger(__name__)
+
+VALID_TOKENS = {"super-secret-token-abc123", "another-valid-token"}
+
+# Asynchronous validation - check against cache
+
+request_data = contextvars.ContextVar('request_data', default={})
 
 
-def main():
-    mcp.run(transport="stdio")
+async def validate_token(token: str) -> bool:
+    # Check if token exists in Redis, database, etc.
+    request_data.set(token)
+    return bool(token)
+
+verifier = DebugTokenVerifier(
+    validate=validate_token,
+)
+
+mcp = FastMCP(
+    "shipra-alerts",
+    auth=verifier
+)
+
+request_data = contextvars.ContextVar('request_data', default={})
+
+security = HTTPBearer()
+
+
+@mcp.tool()
+async def whoami() -> str:
+    """Returns the authenticated user's identity."""
+    token = request_data.get()
+    return json.dumps(token)
 
 
 @mcp.tool()
@@ -24,7 +68,8 @@ async def retrieve_alerts() -> str:
     Returns:
         str: A list of stock alerts for the user.
     """
-    res = await get_alert_list()
+    token = request_data.get()
+    res = await get_alert_list(token)
     return res
 
 
@@ -39,7 +84,7 @@ async def retrieve_alert(id: str) -> str:
         str: The stock alert details.
     """
     res = await get_alert(id)
-    return res
+    return json.loads(res)
 
 
 @mcp.tool()  # RSI
@@ -107,7 +152,9 @@ async def create_rsi_alert(
         },
     }
 
-    return await create_alert(payload=payload)
+    token = request_data.get()
+    res = await create_alert(payload=payload, token=token)
+    return json.loads(res)
 
 
 @mcp.tool()  # Price
@@ -197,8 +244,9 @@ async def create_price_alert(
         },
         "notifications": notifications,
     }
-
-    return await create_alert(payload=payload)
+    token = request_data.get()
+    res = await create_alert(payload=payload, token=token)
+    return json.loads(res)
 
 
 @mcp.tool()  # DRAWDOWN
@@ -268,8 +316,10 @@ async def create_drawdown_alert(
             **({"email": {"enabled": True, "addresses": [notify_email]}} if notify_email else {})
         },
     }
-
-    return await create_alert(payload=payload)
+    
+    token = request_data.get()
+    res = await create_alert(payload=payload, token=token)
+    return json.loads(res)
 
 
 @mcp.tool()  # DMA
@@ -349,7 +399,9 @@ async def create_dma_alert(
         },
     }
 
-    return await create_alert(payload=payload)
+    token = request_data.get()
+    res = await create_alert(payload=payload, token=token)
+    return json.loads(res)
 
 
 @mcp.tool()  # PE_RATIO
@@ -447,7 +499,9 @@ async def create_pe_alert(
         },
     }
 
-    return await create_alert(payload=payload)
+    token = request_data.get()
+    res = await create_alert(payload=payload, token=token)
+    return json.loads(res)
 
 
 @mcp.tool()  # OPPORTUNITY
@@ -497,7 +551,9 @@ async def create_opportunity_alert(
         },
     }
 
-    return await create_alert(payload=payload)
+    token = request_data.get()
+    res = await create_alert(payload=payload, token=token)
+    return json.loads(res)
 
 
 # @mcp.tool()
@@ -560,8 +616,8 @@ async def create_opportunity_alert(
 #         "notifications": notifications,
 #     }
 
-#     return await create_alert(payload=payload)
+#     return await create_alert(payload=payload, token=token)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
